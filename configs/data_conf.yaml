@@ -1,0 +1,17 @@
+allegro_dataset:
+    queries:
+    - dataset_name: "atlas_lite_scratches_classifier"
+      version_name: "sample_screatches__with_attributes__uvtrainer"
+      frame_query:
+      roi_query:
+    split_id: 'generic'
+    train_annotation_type: 'damage'
+    only_verified_frames: false
+    mapping_labels_from: []
+    mapping_labels_to: []
+    remove_frames_without_annotations: true
+preprocessor_config:
+    padding_type: 'sym_edge'
+    padding_value: 25
+    input_size: (224, 224)
+class_list: [scratch__scratch, paint, rust]
