@@ -8,6 +8,5 @@ pillow
 numpy<1.24.0
 torch
 faiss-cpu
-json
 concurrent
 allegroai
