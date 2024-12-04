@@ -15,8 +15,6 @@ from typing import Optional, List
 from data.uv_dataset import UvDataset
 from data.architecture_utils import custom_collate_fn
 
-os.environ["CLEARML_CONFIG_FILE"] = "/home/barrm/clearml.conf"
-
 
 def create_index_vector(cfg, weights: str, output_dir: str, n_workers: int, batch_size: int, class_list: Optional[List[str]] = None):
     data_config = cfg.get('allegro_dataset')
@@ -64,17 +62,17 @@ def build_dataset(data_config, preprocess_config, class_list: Optional[List[str]
 
 def generate_embeddings(images, model):
     index = faiss.IndexFlatL2(1280)
-    import threading
-    lock = threading.Lock()
 
     def process_frame(image):
-        img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        with torch.no_grad():
-            results = model.predict(img, embed=[18, 21, 15])  # Adjust layers as needed
-        with lock:
+        try:
+            img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            with torch.no_grad():
+                results = model.predict(img, embed=[18, 21, 15])  # Adjust layers as needed
             add_vector_to_index(results[0], index)
             if np.mod(index.ntotal, 100) == 0:
                 print(index.ntotal)
+        except Exception as e:
+            print("Error:", str(e))
 
     with futures.ThreadPoolExecutor(max_workers=4) as executor:
         future_list = [executor.submit(process_frame, image) for image in tqdm(images, desc="Parsing frames")]

@@ -34,11 +34,11 @@ def run_query(weights: str, input_path: str, data_dict: Dict, output_dir: str, t
         query_embed_dist[query_name] = retrieved_distances
         query_results[query_name] = retrieved_images
 
-    plot_embed_dist_hist(query_embed_dist, output_dir)
     dict_output_path = os.path.join(output_dir, 'retrieved_images.json')
     with open(dict_output_path, 'w') as json_file:
         json.dump(query_results, json_file, indent=4)
     print(f"Query results saved to {dict_output_path}")
+    plot_embed_dist_hist(query_embed_dist, output_dir)
 
 
 def retrieve_similar_images(query, model, index, image_paths_bboxes, top_k):
