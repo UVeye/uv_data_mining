@@ -1,5 +1,6 @@
 --extra-index-url https://uvnexus.intra.uveye.xyz/repository/hls-pypi/simple
 --extra-index-url https://shared:HF6w0RbukY@packages.allegro.ai/repository/allegroai/simple
+algo_flows
 uv_dtlp_clml_util
 tqdm
 matplotlib
@@ -8,5 +9,7 @@ pillow
 numpy<1.24.0
 torch
 faiss-cpu
+# faiss-gpu
 concurrent
 allegroai
+ultralytics>=8.3.38
