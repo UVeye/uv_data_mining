@@ -10,7 +10,7 @@ from ultralytics import YOLO
 from typing import Dict, List
 
 
-def run_query(weights: str, input_path: str, data_dict: Dict, output_dir: str):
+def run_query(weights: str, input_path: str, data_dict: Dict, output_dir: str, topk: int):
     assert os.path.isdir(input_path), f"The path {input_path} is not a valid directory."
 
     model = YOLO(weights)
@@ -18,15 +18,15 @@ def run_query(weights: str, input_path: str, data_dict: Dict, output_dir: str):
     query_results = {}
     query_embed_dist = {}
     queries = os.listdir(input_path)
-    for q in queries:
+    for idx, q in enumerate(queries):
         query_path = os.path.join(input_path, q)
-        query_name = os.path.splitext(q)[0]
+        query_name = f'case_{idx}'
         retrieved_images, retrieved_distances = [], []
         for entry in data_dict:
             index_path = entry['index_path']
             image_paths_bboxes = entry['image_paths_bboxes']
 
-            results = similarity_search(index_path, image_paths_bboxes, model, query_path, 10)
+            results = similarity_search(index_path, image_paths_bboxes, model, query_path, top_k=topk)
             retrieved_images += results[0]
             retrieved_distances.append(results[1])
 
@@ -41,7 +41,7 @@ def run_query(weights: str, input_path: str, data_dict: Dict, output_dir: str):
     print(f"Query results saved to {dict_output_path}")
 
 
-def retrieve_similar_images(query, model, index, image_paths_bboxes, top_k=3):
+def retrieve_similar_images(query, model, index, image_paths_bboxes, top_k):
     assert query.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')), \
          f"File '{query}' does not have a valid extension. Accepted extensions are: .png, .jpg, .jpeg, .tiff, .bmp, .gif."
     query = Image.open(query)
@@ -55,7 +55,6 @@ def retrieve_similar_images(query, model, index, image_paths_bboxes, top_k=3):
     faiss.normalize_L2(vector)
 
     distances, indices = index.search(vector, top_k)
-    #filtered_indices, filtered_distances = filter_by_distance(distances, indices)
     retrieved_images = [image_paths_bboxes[idx] for idx in indices[0] if 0 <= idx]
 
     n_images = len(retrieved_images)
@@ -77,14 +76,6 @@ def similarity_search(index_path, image_paths_bboxes, model, query, top_k):
     return retrieved_images, distances
 
 
-def filter_by_distance(distances, indices, ratio=0.5):
-    # Filters the indices and distances based on a ratio of the closest distance.
-    closest_distance = distances[0][0]  # The smallest distance (closest neighbor)
-    filtered_indices = [indices[i] for i, dist in enumerate(distances[0]) if dist <= closest_distance * ratio]
-    filtered_distances = [dist for dist in distances[0] if dist <= closest_distance * ratio]
-    return filtered_indices, filtered_distances
-
-
 def plot_embed_dist_hist(distances_dict: Dict, output_dir: str):
     for query_name in distances_dict.keys():
         distances = distances_dict[query_name]
@@ -103,8 +94,9 @@ def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Training")
     parser.add_argument("--data_json_path", type=str, required=True, help="json dict for the mapping of indices to images and bbox")
     parser.add_argument("--weights", type=str, required=True, help="weights for YOLO model")
-    parser.add_argument("--queries", type=str, required=True, help="image or folder for images (crops) to test")
+    parser.add_argument("--queries", type=str, required=True, help="folder for images (crops) to test")
     parser.add_argument("--output_dir", type=str, required=True, help="folder to save the results to")
+    parser.add_argument("--topk", type=int, required=False, default=10, help="top k indices to use (by embed. dist)")
 
     args = parser.parse_args()
     return args
@@ -115,7 +107,7 @@ def main():
     with open(args.data_json_path, 'r') as json_file:
         data_dict = json.load(json_file)
 
-    run_query(args.weights, args.queries, data_dict, args.output_dir)
+    run_query(args.weights, args.queries, data_dict, args.output_dir, args.topk)
 
 
 if __name__ == "__main__":

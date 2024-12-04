@@ -1,5 +1,4 @@
 import os
-from glob import glob
 import yaml
 import json
 import argparse
@@ -19,7 +18,7 @@ from data.architecture_utils import custom_collate_fn
 os.environ["CLEARML_CONFIG_FILE"] = "/home/barrm/clearml.conf"
 
 
-def create_index_vector(cfg, weights: str, device: str, output_dir: str, n_workers: int, batch_size: int, class_list: Optional[List[str]] = None):
+def create_index_vector(cfg, weights: str, output_dir: str, n_workers: int, batch_size: int, class_list: Optional[List[str]] = None):
     data_config = cfg.get('allegro_dataset')
     preprocess_config = cfg.get('preprocessor_config')
     dataset = build_dataset(data_config, preprocess_config, class_list)
@@ -35,7 +34,7 @@ def create_index_vector(cfg, weights: str, device: str, output_dir: str, n_worke
     data_dict = {}
     for idx, (images, images_paths, bboxes) in enumerate(tqdm(data_loader)):
         print(f"Processing batch {idx}: {batch_size} images")
-        index = generate_embeddings(images_paths, model)
+        index = generate_embeddings(images, model)
         output_idx_path = os.path.join(output_dir, f'vector_part_damages{idx}.index')
         # Save the index
         faiss.write_index(index, output_idx_path)
@@ -46,37 +45,39 @@ def create_index_vector(cfg, weights: str, device: str, output_dir: str, n_worke
                 data_dict[idx] = {'image_paths_bboxes': []}
             data_dict[idx]['image_paths_bboxes'].append({'image_path': path, 'bbox': bbox})
 
-    # Sort the image_paths_bboxes list by image_path (or any other criterion you want)
-    for idx, data in data_dict.items():
-        data['image_paths_bboxes'] = sorted(data['image_paths_bboxes'], key=lambda x: x['image_path'])
+        # Sort the image_paths_bboxes list by image_path (or any other criterion you want)
+        for idx, data in data_dict.items():
+            data['image_paths_bboxes'] = sorted(data['image_paths_bboxes'], key=lambda x: x['image_path'])
 
-    # Now write to JSON, ensuring all values are serializable
-    with open(output_path, 'w') as json_file:
-        json.dump([{'index_path': output_idx_path,
-                    'image_paths_bboxes': values['image_paths_bboxes']}
-                   for index, values in data_dict.items()],
-                  json_file, indent=4)
-
-
-def build_dataset(data_config, preprocess_config, class_list: Optional[List[str]] = None):
-    return UvDataset(data_config, preprocess_config, class_list=class_list)
+        # Now write to JSON, ensuring all values are serializable
+        with open(output_path, 'w') as json_file:
+           json.dump([{'index_path': values['index_path'],
+                   'image_paths_bboxes': values['image_paths_bboxes']}
+                  for index, values in data_dict.items()],
+                 json_file, indent=4)
+        print(f"Updated JSON file saved to {output_path}")
 
 
-def generate_embeddings(images_paths, model):
+def build_dataset(data_config, preprocess_config, class_list: Optional[List[str]] = None, cache_path: Optional[str] = None):
+    return UvDataset(dataset_config=data_config, preprocess_config=preprocess_config, class_list=class_list)
+
+
+def generate_embeddings(images, model):
     index = faiss.IndexFlatL2(1280)
+    import threading
+    lock = threading.Lock()
 
-    def process_frame(image_path):
-        img = Image.open(image_path).convert('RGB')
+    def process_frame(image):
+        img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         with torch.no_grad():
             results = model.predict(img, embed=[18, 21, 15])  # Adjust layers as needed
-        add_vector_to_index(results[0], index)
+        with lock:
+            add_vector_to_index(results[0], index)
+            if np.mod(index.ntotal, 100) == 0:
+                print(index.ntotal)
 
-        if np.mod(index.ntotal, 100) == 0:
-            print(index.ntotal)
-
-    with futures.ThreadPoolExecutor(max_workers=3) as executor:
-        future_list = [executor.submit(process_frame, image_path) for image_path in tqdm(images_paths, desc="Parsing frames")]
-
+    with futures.ThreadPoolExecutor(max_workers=4) as executor:
+        future_list = [executor.submit(process_frame, image) for image in tqdm(images, desc="Parsing frames")]
     return index
 
 
@@ -91,12 +92,11 @@ def add_vector_to_index(embedding, index):
 def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Training")
     parser.add_argument("--config_path", type=str, required=False, help="yaml config for the data",
-                        default='/home/barrm/workspace/uv_similarity_engine/configs/data_conf.yaml')
+                        default='/home/barrm/workspace/uv_data_mining/configs/data_conf.yaml')
     parser.add_argument("--weights", type=str, required=True, help="weights for YOLO model")
     parser.add_argument("--output_dir", type=str, required=True, help="folder to save the results to")
-    parser.add_argument("--device", type=str, required=False, default="cuda:0")
-    parser.add_argument("--n_workers", type=int, required=False, default=1)
-    parser.add_argument("--batch_size", type=int, required=False, default=8)
+    parser.add_argument("--n_workers", type=int, required=False, default=4)
+    parser.add_argument("--batch_size", type=int, required=False, default=1000)
 
     args = parser.parse_args()
     return args
@@ -108,7 +108,7 @@ def main():
         config = yaml.safe_load(config_file)
 
     class_list = config.get('class_list', None)
-    create_index_vector(config, args.weights, args.device, args.output_dir, args.n_workers, args.batch_size, class_list)
+    create_index_vector(config, args.weights, args.output_dir, args.n_workers, args.batch_size, class_list)
 
 
 if __name__ == "__main__":
