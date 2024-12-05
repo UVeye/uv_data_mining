@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import faiss
 from ultralytics import YOLO
-from typing import Dict, List
+from typing import Dict
 
 
 def run_query(weights: str, input_path: str, data_dict: Dict, output_dir: str, topk: int):
