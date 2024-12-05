@@ -43,7 +43,7 @@ def create_dataset_w_imgs_list(data_dict, data_config):
 def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Training")
     parser.add_argument("--retrieved_images_path", type=str, required=True, help="json dict for the retrieved matches")
-    parser.add_argument("--config_path", type=str, required=False, help="yaml config for the data")
+    parser.add_argument("--data_config_path", type=str, required=False, help="yaml config for the data")
 
     args = parser.parse_args()
     return args
@@ -52,7 +52,7 @@ def get_args():
 def main():
     args = get_args()
 
-    with open(args.config_path, "r") as config_file:
+    with open(args.data_config_path, "r") as config_file:
         config = yaml.safe_load(config_file)
 
     with open(args.retrieved_images_path, 'r') as json_file:

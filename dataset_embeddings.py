@@ -89,7 +89,7 @@ def add_vector_to_index(embedding, index):
 
 def get_args():
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Training")
-    parser.add_argument("--config_path", type=str, required=False, help="yaml config for the data",
+    parser.add_argument("--data_config_path", type=str, required=False, help="yaml config for the data",
                         default='/home/barrm/workspace/uv_data_mining/configs/data_conf.yaml')
     parser.add_argument("--weights", type=str, required=True, help="weights for YOLO model")
     parser.add_argument("--output_dir", type=str, required=True, help="folder to save the results to")
@@ -102,7 +102,7 @@ def get_args():
 
 def main():
     args = get_args()
-    with open(args.config_path, "r") as config_file:
+    with open(args.data_config_path, "r") as config_file:
         config = yaml.safe_load(config_file)
 
     class_list = config.get('class_list', None)
